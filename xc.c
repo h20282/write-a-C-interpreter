@@ -4,7 +4,6 @@
 #include <string.h>
 #define int long long // to work with 64bit address
 
-int debug;    // print the executed instructions
 int assembly; // print out the assembly and source
 
 int token; // current token
@@ -40,7 +39,6 @@ int *idmain;
 
 char *src, *old_src;  // pointer to source code string;
 
-int poolsize; // default size of text/data/stack
 int *pc, *bp, *sp, ax, cycle; // virtual machine registers
 
 int *current_id, // current parsed ID
@@ -62,6 +60,7 @@ int expr_type;   // the type of an expression
 // 6: local var 2
 int index_of_bp; // index of bp pointer on stack
 
+// get next token, see all `token =`
 void next() {
     char *last_pos;
     int hash;
@@ -106,14 +105,12 @@ void next() {
             }
 
             // look for existing identifier, linear search
-            current_id = symbols;
-            while (current_id[Token]) {
+            for (current_id = symbols; current_id[Token]; current_id += IdSize) {
                 if (current_id[Hash] == hash && !memcmp((char *)current_id[Name], last_pos, src - last_pos)) {
                     //found one, return
                     token = current_id[Token];
                     return;
                 }
-                current_id = current_id + IdSize;
             }
 
 
@@ -1211,7 +1208,7 @@ void program() {
     }
 }
 
-int eval() {
+int eval(int debug) {
     int op, *tmp;
     cycle = 0;
     while (1) {
@@ -1285,6 +1282,7 @@ int main(int argc, char **argv)
 
     int i, fd;
     int *tmp;
+    int debug;
 
     argc--;
     argv++;
@@ -1310,26 +1308,14 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    poolsize = 256 * 1024; // arbitrary size
+    int poolsize = 256 * 1024; // arbitrary size
     line = 1;
 
     // allocate memory
-    if (!(text = malloc(poolsize))) {
-        printf("could not malloc(%d) for text area\n", poolsize);
-        return -1;
-    }
-    if (!(data = malloc(poolsize))) {
-        printf("could not malloc(%d) for data area\n", poolsize);
-        return -1;
-    }
-    if (!(stack = malloc(poolsize))) {
-        printf("could not malloc(%d) for stack area\n", poolsize);
-        return -1;
-    }
-    if (!(symbols = malloc(poolsize))) {
-        printf("could not malloc(%d) for symbol table\n", poolsize);
-        return -1;
-    }
+    if (!(text = malloc(poolsize))) { printf("could not malloc(%d) for text area\n", poolsize); return -1; }
+    if (!(data = malloc(poolsize))) { printf("could not malloc(%d) for data area\n", poolsize); return -1; }
+    if (!(stack = malloc(poolsize))) { printf("could not malloc(%d) for stack area\n", poolsize); return -1; }
+    if (!(symbols = malloc(poolsize))) { printf("could not malloc(%d) for symbol table\n", poolsize); return -1; }
 
     memset(text, 0, poolsize);
     memset(data, 0, poolsize);
@@ -1342,19 +1328,17 @@ int main(int argc, char **argv)
           "open read close printf malloc memset memcmp exit void main";
 
      // add keywords to symbol table
-    i = Char;
-    while (i <= While) {
+    for (i=Char; i<=While; ++i){
         next();
-        current_id[Token] = i++;
+        current_id[Token] = i;
     }
 
     // add library to symbol table
-    i = OPEN;
-    while (i <= EXIT) {
+    for (i=OPEN; i<=EXIT; ++i){
         next();
         current_id[Class] = Sys;
         current_id[Type] = INT;
-        current_id[Value] = i++;
+        current_id[Value] = i;
     }
 
     next(); current_id[Token] = Char; // handle void type
@@ -1393,5 +1377,5 @@ int main(int argc, char **argv)
     *--sp = (int)argv;
     *--sp = (int)tmp;
 
-    return eval();
+    return eval(debug);
 }
